@@ -48,6 +48,120 @@ function getImagePrintData() {
   return printData;
 }
 
+let line = 0;
+let remaining = 50;
+
+function getPrintDataFromPort() {
+  let printData = [];
+
+  // ********
+  // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
+  // PRINTING HEADER
+
+  // Initialize printer
+  printData[0] = 27;  
+  printData[1] = 64;
+
+  // Select justification
+  printData[2] = 27; 
+  printData[3] = 97; 
+
+  // Justify (0=left, 1=center, 2=right)
+  printData[4] = 1; 
+
+  // End of header
+  printData[5] = 31; 
+  printData[6] = 17; 
+  printData[7] = 2; 
+  printData[8] = 4; 
+  // ********
+
+  while (remaining > 0) {
+    let lines = remaining
+    if (lines > 256) {
+      lines = 256;
+    }
+    // ********
+    // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
+    // PRINTING MARKER
+
+    // 0x761d.to_bytes(2, 'little') -> b'\x1dv'.hex() -> 1d76
+
+    printData[9] = 29
+    printData[10] = 118
+
+    // stdout.write(0x0030.to_bytes(2, 'little'))
+    printData[11] = 48
+    printData[12] = 0
+
+    printData[13] = 48
+    printData[14] = 0
+  
+    printData[15] = lines - 1
+    printData[16] = 0
+    // ********
+    let index = 17;
+
+    remaining -= lines;
+
+    while (lines > 0) {
+      // ******
+      // PRINT LINE
+
+      // Each bit represents whether we're printing a pixel or not (1 = yes, print black; 0 = no, print nothing)
+      // Therefore we need to go width / 8
+
+      const IMAGE_WIDTH = 384;
+      for (let i = 0; i < IMAGE_WIDTH / 8; i++) {
+        // Everything just black for now
+        printData[index] = 255;
+        index++;
+      }
+      // ******
+      lines--;
+      line++;
+    }
+    
+    // ******
+    // PRINT FOOTER
+    printData[index++] = 27;
+    printData[index++] = 100;
+    printData[index++] = 2;
+
+    printData[index++] = 27;
+    printData[index++] = 100;
+    printData[index++] = 2;
+
+    // b'\x1f\x11\x08'
+    printData[index++] = 31;
+    printData[index++] = 17;
+    printData[index++] = 8;
+    // \x1f\x11\x0e
+    printData[index++] = 31;
+    printData[index++] = 17;
+    printData[index++] = 14;
+
+    // x1f\x11\x07
+    printData[index++] = 31;
+    printData[index++] = 17;
+    printData[index++] = 7;
+
+    // b'\x1f\x11\x09'
+    printData[index++] = 31;
+    printData[index++] = 17;
+    printData[index++] = 9;
+
+
+    const uint8DataArray = new Uint8Array(printData);
+    return uint8DataArray;
+  }
+
+
+
+  return printData;
+}
+
+
 
 
 noble.on('discover', async (p) => {
@@ -71,13 +185,9 @@ noble.on('discover', async (p) => {
               continue;
             }
             console.log(characterstic.properties);
-            const data = getImagePrintData();
-            let encoder = new TextEncoder("utf-8");
-            // Add line feed + carriage return chars to text
-            let text = encoder.encode("this is a test" + '\u000A\u000D');  
+            const data = getPrintDataFromPort();
 
             characterstic.write(Buffer.from(data), true);
-            characterstic.write(Buffer.from(text));
           }
         });
 
