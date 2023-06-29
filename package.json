@@ -1,7 +1,10 @@
 {
   "dependencies": {
     "@abandonware/noble": "^1.9.2-21",
-    "noble": "^1.9.1"
+    "escpos-buffer": "^4.0.5",
+    "noble": "^1.9.1",
+    "node-thermal-printer": "^4.2.1",
+    "react-thermal-printer": "^0.13.0"
   },
   "name": "another",
   "version": "1.0.0",
