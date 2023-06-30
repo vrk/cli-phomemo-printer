@@ -10,7 +10,7 @@ import { PNG } from 'pngjs';
 
 const { Spinner } = spinner;
 
-const BYTES_PER_LINE = 70; // TODO: Make this configurable
+const BYTES_PER_LINE = 69; // TODO: Make this configurable
 const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
 const SCAN_AGAIN_SELECTION = "__scan_again__";
@@ -24,12 +24,13 @@ let discoveredDevices = {};
 
 const program = new Command();
 program
-  .option('-f, --file <path>', 'path for image to print', './burger.png');
+  .option('-f, --file <path>', 'path for image to print', './burger.png')
+  .option('-s, --scale <size>', 'percent scale at which the image should print (1-100)', 100);
 program.parse(process.argv);
-const { file } = program.opts()
+const { file, scale } = program.opts()
 
-if (file) {
-  const printableImgPath = await makeDitheredImage(file);
+if (file, scale) {
+  const printableImgPath = await makeDitheredImage(file, scale);
 
 
   printerMenu(printableImgPath);
@@ -274,15 +275,27 @@ async function getPrintDataFromPort(printableImgPath) {
 
 
 
-async function makeDitheredImage(imgPath) {
+async function makeDitheredImage(imgPath, scale) {
   let originalFileName = path.basename('path');
   if (!originalFileName) {
     throw new Error();
   }
-  const resizedImgPath = `${imgPath}--resized.png`;
   let pic = await Jimp.read(imgPath);
-  pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
-  await pic.writeAsync(resizedImgPath);
+  const scalePercentage = Math.min(Math.max(scale / 100.0, 0.0), 1.0); 
+  const scaledWidth = Math.floor(scalePercentage * IMAGE_WIDTH);
+
+  // Scale the given image to the desired size.
+  const resizedImgPath = `${imgPath}--resized.png`;
+  pic = pic.resize(scaledWidth, Jimp.AUTO)
+
+  // Scale a transparent background to the width expected by the printer, and the height
+  // of the scaled image.
+  let transparentBackground = await Jimp.read('./transparent-square.png');
+  transparentBackground = transparentBackground.resize(IMAGE_WIDTH, pic.bitmap.height);
+  const x = IMAGE_WIDTH - pic.bitmap.width;
+  const composedPic = transparentBackground.composite(pic, x, 0);  
+
+  await composedPic.writeAsync(resizedImgPath);
   return convertToDithered(resizedImgPath);
 }
 
