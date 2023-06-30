@@ -4,6 +4,12 @@ a nodejs script that allows you to print images to a phomemo printer.
 
 Tested with [phomemo M02s](https://phomemo.com/collections/phomemo-m02s). 
 
+
+
+https://github.com/vrk/cli-phomemo-printer/assets/610200/edcb1904-9748-4fbc-8a5c-6d164e96b8fd
+
+
+
 ### How to install & run
 
 This isn't listed on npm (yet?) so you need to clone and build locally to run, e.g.
