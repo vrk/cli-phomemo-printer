@@ -71,8 +71,9 @@ async function printerMenu(printableImgPath) {
       }
 
       // We *can* write to this device, so let's ask for an image now.
-      // const data = await getPrintDataFromPort(printableImgPath);
-      // characteristic.write(Buffer.from(data), true);
+      const data = await getPrintDataFromPort(printableImgPath);
+      characteristic.write(Buffer.from(data), true);
+      await delay(100000);
       process.exit();
     }
   } while (true);
