@@ -10,7 +10,7 @@ import { PNG } from 'pngjs';
 
 const { Spinner } = spinner;
 
-const BYTES_PER_LINE = 60; // TODO: Make this configurable
+const BYTES_PER_LINE = 30; // TODO: Make this configurable
 const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
 const SCAN_AGAIN_SELECTION = "__scan_again__";
@@ -73,7 +73,7 @@ async function printerMenu(printableImgPath) {
       // We *can* write to this device, so let's ask for an image now.
       const data = await getPrintDataFromPort(printableImgPath);
       characteristic.write(Buffer.from(data), true);
-      await delay(100000);
+      await delay(10000);
       process.exit();
     }
   } while (true);
@@ -164,7 +164,7 @@ async function getPrintDataFromPort(printableImgPath) {
   printData[3] = 97; 
 
   // Justify (0=left, 1=center, 2=right)
-  printData[4] = 1; 
+  printData[4] = 0; 
 
   // End of header
   printData[5] = 31; 
