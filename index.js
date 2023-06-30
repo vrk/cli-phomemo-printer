@@ -274,7 +274,7 @@ async function makeDitheredImage(imgPath, scale) {
     throw new Error();
   }
   let pic = await Jimp.read(imgPath);
-  const scalePercentage = Math.min(Math.max(scale / 100.0, 0.0), 1.0); 
+  const scalePercentage = Math.max(scale / 100.0, 0.01); 
   const scaledWidth = Math.floor(scalePercentage * IMAGE_WIDTH);
 
   // Scale the given image to the desired size.
