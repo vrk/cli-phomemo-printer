@@ -18,7 +18,7 @@ const { Spinner } = spinner;
 // Tbh I'm not sure what's the right way to calcuate this properly; I just guessed & checked until
 // I got an image that printed full-width!
 //
-const BYTES_PER_LINE = 69;
+const BYTES_PER_LINE = 70;
 const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
 const SCAN_AGAIN_SELECTION = "__scan_again__";
@@ -37,12 +37,10 @@ program
 program.parse(process.argv);
 const { file, scale } = program.opts()
 
-if (file, scale) {
-  const printableImgPath = await makeDitheredImage(file, scale);
-
-
-  printerMenu(printableImgPath);
-}
+const printableImgPath = await makeDitheredImage(file, scale);
+const characteristic = await getDeviceCharacteristicMenu(printableImgPath);
+const data = await getPrintDataFromPort(printableImgPath);
+characteristic.write(Buffer.from(data), true);
 
 //
 // functions
@@ -52,7 +50,7 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function printerMenu(printableImgPath) {
+async function getDeviceCharacteristicMenu(printableImgPath) {
   let scanDurationInMs = 5000;
   do {
     await scanDevices(scanDurationInMs);
@@ -77,13 +75,10 @@ async function printerMenu(printableImgPath) {
         } else {
           process.exit();
         }
+      } else {
+        // We can write to the device, so send the characteristic.
+        return characteristic;
       }
-
-      // We *can* write to this device, so let's ask for an image now.
-      const data = await getPrintDataFromPort(printableImgPath);
-      characteristic.write(Buffer.from(data), true);
-      await delay(10000);
-      process.exit();
     }
   } while (true);
 }
@@ -289,6 +284,8 @@ async function makeDitheredImage(imgPath, scale) {
   const composedPic = transparentBackground.composite(pic, x, 0);  
 
   await composedPic.writeAsync(resizedImgPath);
+
+  // TODO: Swap out dithering library for something that works better with B&W images.
   return convertToDithered(resizedImgPath);
 }
 
@@ -301,4 +298,3 @@ async function convertToDithered(resizedImgPath) {
     });
   });
 }
-

@@ -12,7 +12,7 @@
     "pngjs": "^7.0.0",
     "react-thermal-printer": "^0.13.0"
   },
-  "name": "cli phomemo printer",
+  "name": "cli-phomemo-printer",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
