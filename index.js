@@ -1,7 +1,9 @@
 import noble from '@abandonware/noble';
 import spinner from 'cli-spinner';
+import { Command } from 'commander';
 import floydSteinberg from 'floyd-steinberg';
 import { createReadStream, createWriteStream } from 'fs';
+import * as path from 'path';
 import { select, confirm } from '@inquirer/prompts';
 import Jimp from "jimp";
 import { PNG } from 'pngjs';
@@ -18,14 +20,28 @@ const QUIT_SELECTION = "__quit__";
 
 let discoveredDevices = {};
 
-main();
+//////////////////////////////////////////////
+// main
+//////////////////////////////////////////////
 
+const program = new Command();
+program
+  .option('-f, --file <path>', 'path for image to print', './burger.png');
+program.parse(process.argv);
+const { file } = program.opts()
+
+if (file) {
+  const printableImgPath = await makeDitheredImage(file);
+
+
+  printerMenu(printableImgPath);
+}
 
 //////////////////////////////////////////////
 // functions
 //////////////////////////////////////////////
 
-async function main() {
+async function printerMenu(printableImgPath) {
   let scanDurationInMs = 5000;
   do {
     await scanDevices(scanDurationInMs);
@@ -53,7 +69,7 @@ async function main() {
       }
 
       // We *can* write to this device, so let's ask for an image now.
-      // const data = await getPrintDataFromPort();
+      // const data = await getPrintDataFromPort(printableImgPath);
       // characteristic.write(Buffer.from(data), true);
       process.exit();
     }
@@ -122,15 +138,16 @@ async function promptTryAgain() {
 
 async function printData(peripheral, data) {
 
+  floydSteinberg(image)
 }
 
 let line = 0;
 let remaining = 480;
 
-async function getPrintDataFromPort() {
+async function getPrintDataFromPort(printableImgPath) {
   // await getImageDataBurger()
   // return;
-  const pic = (await Jimp.read("burger2.png"))
+  const pic = await Jimp.read(printableImgPath)
   let printData = [];
   // return printData;
   // const uint8DataArray = new Uint8Array(printData);
@@ -262,6 +279,17 @@ async function getPrintDataFromPort() {
 
 
 
+async function makeDitheredImage(imgPath) {
+  let originalFileName = path.basename('path');
+  if (!originalFileName) {
+    throw new Error();
+  }
+  const resizedImgPath = `${imgPath}-resized`;
+  let pic = await Jimp.read(imgPath);
+  pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
+  await pic.writeAsync(resizedImgPath);
+  return convertToDithered(resizedImgPath);
+}
 
 
 
@@ -269,9 +297,6 @@ async function getPrintDataFromPort() {
 async function getImageData() {
   let grayscaleData = [];
   console.log('here');
-  // pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
-  // await pic.writeAsync("burger3.png");
-  // pic = await Jimp.read("burger3.png");
   console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
   for (let x = 0; x < pic.bitmap.width; x++) {
     for (let y = 0; y < pic.bitmap.height; y++) {
@@ -289,11 +314,12 @@ async function getImageData() {
 }
 
 
-async function getImageDataBurger() {
+async function convertToDithered(resizedImgPath) {
+  const ditheredImgPath = `${resizedImgPath}-dithered`;
   return new Promise((resolve) => {
-    createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
-      floydSteinberg(this).pack().pipe(createWriteStream('burger2.png'));
-      resolve();
+    createReadStream(resizedImgPath).pipe(new PNG()).on('parsed', function() {
+      floydSteinberg(this).pack().pipe(createWriteStream(ditheredImgPath));
+      resolve(ditheredImgPath);
     });
   });
 }
