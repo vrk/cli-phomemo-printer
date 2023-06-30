@@ -3,7 +3,7 @@ import spinner from 'cli-spinner';
 import floydSteinberg from 'floyd-steinberg';
 import { createReadStream, createWriteStream } from 'fs';
 import { select } from '@inquirer/prompts';
-import * as Jimp from "jimp";
+import Jimp from "jimp";
 import { PNG } from 'pngjs';
 
 import { delay } from "./util/index.js";
@@ -38,10 +38,17 @@ async function main() {
       process.exit();
     } else {
       console.log(choice);
+      let peripheral = discoveredDevices[choice];
+      await isWritable(peripheral);
+
+
+      await delay(100000);
+
       process.exit();
     }
   } while (true);
 }
+
 
 async function scanDevices(scanDurationInMs=5000) {
   discoveredDevices = {};
@@ -89,40 +96,37 @@ async function selectDevice() {
   return select(prompt);
 }
 
-  // if (localName == 'M02S') {
-  //   console.log('here')
-  //   await noble.stopScanningAsync();
-  //   p.on('connect', () => {
-  //     console.log("it's me vrk");
-  //   })
-  //   p.on("disconnect", () => {
-  //     console.log("it's me vrk 2");
-  //   })
-  //   p.on("servicesDiscover", async (services) => {
-  //     console.log("it's me vrk 3", services.length);
-  //     for (const service of services) {
-  //       service.discoverCharacteristics(); // any characteristic UUI
-  //       service.once('characteristicsDiscover', async (characteristics) => {
-  //         for (const characterstic of characteristics) {
-  //           if (!characterstic.properties.includes('write')) {
-  //             continue;
-  //           }
-  //           console.log(characterstic.properties);
-  //           const data = await getPrintDataFromPort();
-
-  //           characterstic.write(Buffer.from(data), true);
+async function isWritable(peripheral) {
+  // peripheral.on("servicesDiscover", async (services) => {
+  //   console.log("it's me vrk 3", services.length);
+  //   for (const service of services) {
+  //     service.discoverCharacteristics(); // any characteristic UUI
+  //     service.once('characteristicsDiscover', async (characteristics) => {
+  //       for (const characterstic of characteristics) {
+  //         if (!characterstic.properties.includes('write')) {
+  //           continue;
   //         }
-  //       });
+  //         console.log(characterstic.properties);
+  //       }
+  //     });
+  //   }
+  // })
+  await peripheral.connectAsync();
+  // TODO: see if I can just use the async thing
+  const { characteristics } = await peripheral.discoverAllServicesAndCharacteristicsAsync();
+  const [characteristic] = characteristics.filter(characteristic => { 
+    return characteristic.properties.includes('write');
+  })
+  if (!characteristic) {
+    return false;
+  }
+  const data = await getPrintDataFromPort();
+  characteristic.write(Buffer.from(data), true);
+}
 
-  //     }
-  //   })
-  //   await p.connectAsync();
-  //   console.log('hihi')
-  //   const {characteristics} = await p.discoverAllServicesAndCharacteristicsAsync();
-  //   console.log("hiii", characteristics);
-  // }
-// });
+async function printData(peripheral, data) {
 
+}
 
 let line = 0;
 let remaining = 480;
@@ -130,7 +134,7 @@ let remaining = 480;
 async function getPrintDataFromPort() {
   // await getImageDataBurger()
   // return;
-  const pic = (await read("burger2.png"))
+  const pic = (await Jimp.read("burger2.png"))
   let printData = [];
   // return printData;
   // const uint8DataArray = new Uint8Array(printData);
@@ -206,7 +210,7 @@ async function getPrintDataFromPort() {
 
         let byte = 0;
         for (let bit = 0; bit < 8; bit++) {
-          const rgba = intToRGBA(pic.getPixelColor(x * 8 + bit, line));
+          const rgba = Jimp.intToRGBA(pic.getPixelColor(x * 8 + bit, line));
           if (rgba.r === 0 && rgba.a !== 0) {
             byte |= 1 << (7 - bit)
           }
