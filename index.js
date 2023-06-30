@@ -207,9 +207,6 @@ async function getPrintDataFromPort(printableImgPath) {
       // ******
       // PRINT LINE
 
-      // Each bit represents whether we're printing a pixel or not (1 = yes, print black; 0 = no, print nothing)
-      // Therefore we need to go width / 8
-
       for (let x = 0; x < BYTES_PER_LINE; x++) {
         // Everything just black for now
         // if (i % 2 === 0) {
