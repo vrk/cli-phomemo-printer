@@ -140,84 +140,72 @@ async function promptTryAgain() {
   return confirm({ message: 'want to try again?' });
 }
 
-let line = 0;
 
 async function getPrintDataFromPort(printableImgPath) {
-  // await getImageDataBurger()
-  // return;
   const pic = await Jimp.read(printableImgPath)
   let remaining = pic.bitmap.height;
   let printData = [];
-  // return printData;
-  // const uint8DataArray = new Uint8Array(printData);
-  // return uint8DataArray;
+  let index = 0;
 
   // ********
   // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
   // PRINTING HEADER
 
   // Initialize printer
-  printData[0] = 27;  
-  printData[1] = 64;
+  printData[index++] = 27;
+  printData[index++] = 64;
 
   // Select justification
-  printData[2] = 27; 
-  printData[3] = 97; 
+  printData[index++] = 27; 
+  printData[index++] = 97; 
 
   // Justify (0=left, 1=center, 2=right)
-  printData[4] = 0; 
+  printData[index++] = 0; 
 
   // End of header
-  printData[5] = 31; 
-  printData[6] = 17; 
-  printData[7] = 2; 
-  printData[8] = 4;
+  printData[index++] = 31; 
+  printData[index++] = 17; 
+  printData[index++] = 2; 
+  printData[index++] = 4;
   // ********
 
-  let index = 9;
+  let line = 0;
+
   while (remaining > 0) {
     let lines = remaining
     if (lines > 256) {
       lines = 256;
     }
+  
     // ********
-    // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
+    // FROM https://github.com/vivier/phomemo-tools/tree/master#32-block-marker
     // PRINTING MARKER
 
-    // 0x761d.to_bytes(2, 'little') -> b'\x1dv'.hex() -> 1d76
-
+    // Print raster bit image
     printData[index++] = 29
     printData[index++] = 118
-
-    // stdout.write(0x0030.to_bytes(2, 'little'))
     printData[index++] = 48
+
+    // Mode: 0=normal, 1=double width, 2=double height, 3=quadruple
     printData[index++] = 0
 
+    // Bytes per line
     printData[index++] = BYTES_PER_LINE
     printData[index++] = 0
   
-    printData[index++] = lines - 1
-    console.log("lines is", lines);
+    // Number of lines to print in this block.
+    printData[index++] = lines - 1;
     printData[index++] = 0
     // ********
 
     remaining -= lines;
-    console.log("remaining", remaining);
 
     while (lines > 0) {
       // ******
       // PRINT LINE
-
       for (let x = 0; x < BYTES_PER_LINE; x++) {
-        // Everything just black for now
-        // if (i % 2 === 0) {
-        //   printData[index] = 255;
-        // } else {
-        //   printData[index] = 255;
-        // }
-        // printData[index] = burgerData[i * 4];
-
         let byte = 0;
+
         for (let bit = 0; bit < 8; bit++) {
           const rgba = Jimp.intToRGBA(pic.getPixelColor(x * 8 + bit, line));
           if (rgba.r === 0 && rgba.a !== 0) {
@@ -227,8 +215,7 @@ async function getPrintDataFromPort(printableImgPath) {
         if (byte === 0x0a) {
           byte = 0x14;
         }
-        printData[index] = byte;
-        index++;
+        printData[index++] = byte;
       }
       // ******
       lines--;
@@ -237,9 +224,11 @@ async function getPrintDataFromPort(printableImgPath) {
   }
 
 
-
   // ******
+  // FROM: https://github.com/vivier/phomemo-tools/tree/master#33-footer
   // PRINT FOOTER
+
+  // command ESC d : print and feed n lines (twice)
   printData[index++] = 27;
   printData[index++] = 100;
   printData[index++] = 2;
@@ -247,6 +236,8 @@ async function getPrintDataFromPort(printableImgPath) {
   printData[index++] = 27;
   printData[index++] = 100;
   printData[index++] = 2;
+
+  // just footer codes now
 
   // b'\x1f\x11\x08'
   printData[index++] = 31;
@@ -267,13 +258,8 @@ async function getPrintDataFromPort(printableImgPath) {
   printData[index++] = 17;
   printData[index++] = 9;
 
-
-  // const uint8DataArray = new Uint8Array(printData);
-  // return uint8DataArray;
   return printData;
 }
-
-
 
 async function makeDitheredImage(imgPath, scale) {
   let originalFileName = path.basename('path');
