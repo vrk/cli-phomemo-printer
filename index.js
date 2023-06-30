@@ -1,16 +1,22 @@
 import noble from '@abandonware/noble';
-import * as Jimp from "jimp";
-import { createReadStream, createWriteStream } from 'fs';
-import floydSteinberg from 'floyd-steinberg';
-import { PNG } from 'pngjs';
 import spinner from 'cli-spinner';
+import floydSteinberg from 'floyd-steinberg';
+import { createReadStream, createWriteStream } from 'fs';
+import { select } from '@inquirer/prompts';
+import * as Jimp from "jimp";
+import { PNG } from 'pngjs';
+
 import { delay } from "./util/index.js";
+
 const { Spinner } = spinner;
 
 
 
 const BYTES_PER_LINE = 60;
-const discovered = {};
+const SCAN_AGAIN_SELECTION = "__scan_again__";
+const QUIT_SELECTION = "__quit__";
+
+let discoveredDevices = {};
 
 main();
 
@@ -20,28 +26,69 @@ main();
 //////////////////////////////////////////////
 
 async function main() {
+  let scanDurationInMs = 5000;
+  do {
+    await scanDevices(scanDurationInMs);
+    const choice = await selectDevice();
+
+    if (choice === SCAN_AGAIN_SELECTION) {
+      scanDurationInMs = 10000; // Try a longer duration the second time
+      scanDevices();
+    } else if (choice == QUIT_SELECTION) {
+      process.exit();
+    } else {
+      console.log(choice);
+      process.exit();
+    }
+  } while (true);
+}
+
+async function scanDevices(scanDurationInMs=5000) {
+  discoveredDevices = {};
+
   const spinner = new Spinner('scanning bluetooth devices.. %s');
   spinner.setSpinnerString('|/-\\');
   spinner.start();
-
-  scanDevices();
-  await delay(5000);
-  await noble.stopScanningAsync();
-  spinner.stop(true);
-
-
-}
-
-function scanDevices() {
-  noble.startScanningAsync();
   noble.on('discover', async (peripheral) => {
     const { localName } = peripheral.advertisement;
     if (localName === undefined || localName.trim().length === 0) {
       return;
     }
-    discovered[localName] = peripheral;
+    discoveredDevices[localName] = peripheral;
   });
+  noble.startScanningAsync();
+
+  await delay(scanDurationInMs);
+
+  await noble.stopScanningAsync();
+  spinner.stop(true);
 }
+
+async function selectDevice() {
+  const choices = [];
+  for (const key in discoveredDevices) {
+    choices.push({
+      value: key
+    });
+  }
+  choices.push({
+    name: "- Scan again",
+    value: SCAN_AGAIN_SELECTION
+  });
+
+  choices.push({
+    name: "- Quit",
+    value: QUIT_SELECTION
+  });
+
+  const prompt = {
+    message: "Select your bluetooth printer",
+    choices,
+    pageSize: 12
+  }
+  return select(prompt);
+}
+
   // if (localName == 'M02S') {
   //   console.log('here')
   //   await noble.stopScanningAsync();
