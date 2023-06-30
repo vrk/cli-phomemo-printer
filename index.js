@@ -1,30 +1,38 @@
-const noble = require('@abandonware/noble');
-const Jimp = require("jimp");
-const fs = require('fs')
-const floydSteinberg = require('floyd-steinberg');
-const PNG = require('pngjs').PNG;
+import noble from '@abandonware/noble';
+import * as Jimp from "jimp";
+import { createReadStream, createWriteStream } from 'fs';
+import floydSteinberg from 'floyd-steinberg';
+import { PNG } from 'pngjs';
 
-//////////////////////////////////////////////
-// Main
-//////////////////////////////////////////////
 
 const BYTES_PER_LINE = 60;
-
 const discovered = {};
 
-function scanDevices() {
+main();
+
+
+//////////////////////////////////////////////
+// functions
+//////////////////////////////////////////////
+
+function main() {
+  scanDevices();
 
 }
-noble.startScanningAsync();
-noble.on('discover', async (peripheral) => {
-  const { localName } = peripheral.advertisement;
-  if (localName === undefined || localName.trim().length === 0) {
-    return;
-  }
-  if (!discovered[localName]) {
-    console.log(localName);
-  }
-  discovered[localName] = peripheral;
+
+function scanDevices() {
+  noble.startScanningAsync();
+  noble.on('discover', async (peripheral) => {
+    const { localName } = peripheral.advertisement;
+    if (localName === undefined || localName.trim().length === 0) {
+      return;
+    }
+    if (!discovered[localName]) {
+      console.log(localName);
+    }
+    discovered[localName] = peripheral;
+  });
+}
   // if (localName == 'M02S') {
   //   console.log('here')
   //   await noble.stopScanningAsync();
@@ -57,7 +65,7 @@ noble.on('discover', async (peripheral) => {
   //   const {characteristics} = await p.discoverAllServicesAndCharacteristicsAsync();
   //   console.log("hiii", characteristics);
   // }
-});
+// });
 
 
 let line = 0;
@@ -66,7 +74,7 @@ let remaining = 480;
 async function getPrintDataFromPort() {
   // await getImageDataBurger()
   // return;
-  const pic = (await Jimp.read("burger2.png"))
+  const pic = (await read("burger2.png"))
   let printData = [];
   // return printData;
   // const uint8DataArray = new Uint8Array(printData);
@@ -142,7 +150,7 @@ async function getPrintDataFromPort() {
 
         let byte = 0;
         for (let bit = 0; bit < 8; bit++) {
-          const rgba = Jimp.intToRGBA(pic.getPixelColor(x * 8 + bit, line));
+          const rgba = intToRGBA(pic.getPixelColor(x * 8 + bit, line));
           if (rgba.r === 0 && rgba.a !== 0) {
             byte |= 1 << (7 - bit)
           }
@@ -212,7 +220,7 @@ async function getImageData() {
   for (let x = 0; x < pic.bitmap.width; x++) {
     for (let y = 0; y < pic.bitmap.height; y++) {
     // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
-      const rgba = Jimp.intToRGBA(pic.getPixelColor(x, y));
+      const rgba = intToRGBA(pic.getPixelColor(x, y));
       if (rgba.r === 0 && rgba.a !== 0) {
         grayscaleData.push(0)
       } else {
@@ -227,8 +235,8 @@ async function getImageData() {
 
 async function getImageDataBurger() {
   return new Promise((resolve) => {
-    fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
-      floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
+    createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
+      floydSteinberg(this).pack().pipe(createWriteStream('burger2.png'));
       resolve();
     });
   });
