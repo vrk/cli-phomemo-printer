@@ -8,13 +8,11 @@ import { select, confirm } from '@inquirer/prompts';
 import Jimp from "jimp";
 import { PNG } from 'pngjs';
 
-import { delay } from "./util/index.js";
-
 const { Spinner } = spinner;
 
+const BYTES_PER_LINE = 60; // TODO: Make this configurable
+const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
-
-const BYTES_PER_LINE = 60;
 const SCAN_AGAIN_SELECTION = "__scan_again__";
 const QUIT_SELECTION = "__quit__";
 
@@ -40,6 +38,10 @@ if (file) {
 //////////////////////////////////////////////
 // functions
 //////////////////////////////////////////////
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 async function printerMenu(printableImgPath) {
   let scanDurationInMs = 5000;
@@ -134,11 +136,6 @@ async function getWritableCharacteristic(peripheral) {
 async function promptTryAgain() {
   console.log("dang it doesn't look like we can print to this device 😕")
   return confirm({ message: 'want to try again?' });
-}
-
-async function printData(peripheral, data) {
-
-  floydSteinberg(image)
 }
 
 let line = 0;
@@ -290,29 +287,6 @@ async function makeDitheredImage(imgPath) {
   await pic.writeAsync(resizedImgPath);
   return convertToDithered(resizedImgPath);
 }
-
-
-
-
-async function getImageData() {
-  let grayscaleData = [];
-  console.log('here');
-  console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
-  for (let x = 0; x < pic.bitmap.width; x++) {
-    for (let y = 0; y < pic.bitmap.height; y++) {
-    // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
-      const rgba = intToRGBA(pic.getPixelColor(x, y));
-      if (rgba.r === 0 && rgba.a !== 0) {
-        grayscaleData.push(0)
-      } else {
-        grayscaleData.push(1)
-      }
-    }
-  }
-  
-  return grayscaleData;
-}
-
 
 async function convertToDithered(resizedImgPath) {
   const ditheredImgPath = `${resizedImgPath}-dithered`;
