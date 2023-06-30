@@ -3,6 +3,10 @@ import * as Jimp from "jimp";
 import { createReadStream, createWriteStream } from 'fs';
 import floydSteinberg from 'floyd-steinberg';
 import { PNG } from 'pngjs';
+import spinner from 'cli-spinner';
+import { delay } from "./util/index.js";
+const { Spinner } = spinner;
+
 
 
 const BYTES_PER_LINE = 60;
@@ -15,8 +19,16 @@ main();
 // functions
 //////////////////////////////////////////////
 
-function main() {
+async function main() {
+  const spinner = new Spinner('scanning bluetooth devices.. %s');
+  spinner.setSpinnerString('|/-\\');
+  spinner.start();
+
   scanDevices();
+  await delay(5000);
+  await noble.stopScanningAsync();
+  spinner.stop(true);
+
 
 }
 
@@ -26,9 +38,6 @@ function scanDevices() {
     const { localName } = peripheral.advertisement;
     if (localName === undefined || localName.trim().length === 0) {
       return;
-    }
-    if (!discovered[localName]) {
-      console.log(localName);
     }
     discovered[localName] = peripheral;
   });
