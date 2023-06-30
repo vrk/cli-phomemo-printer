@@ -2,7 +2,7 @@ import noble from '@abandonware/noble';
 import spinner from 'cli-spinner';
 import floydSteinberg from 'floyd-steinberg';
 import { createReadStream, createWriteStream } from 'fs';
-import { select } from '@inquirer/prompts';
+import { select, confirm } from '@inquirer/prompts';
 import Jimp from "jimp";
 import { PNG } from 'pngjs';
 
@@ -37,18 +37,28 @@ async function main() {
     } else if (choice == QUIT_SELECTION) {
       process.exit();
     } else {
-      console.log(choice);
+
+      // Let's see if we can write to this device.
       let peripheral = discoveredDevices[choice];
-      await isWritable(peripheral);
+      const characteristic = await getWritableCharacteristic(peripheral);
 
+      // Looks like we can't write to this device.
+      if (!characteristic) {
+        const tryAgain = await promptTryAgain()
+        if (tryAgain) {
+          continue;
+        } else {
+          process.exit();
+        }
+      }
 
-      await delay(100000);
-
+      // We *can* write to this device, so let's ask for an image now.
+      // const data = await getPrintDataFromPort();
+      // characteristic.write(Buffer.from(data), true);
       process.exit();
     }
   } while (true);
 }
-
 
 async function scanDevices(scanDurationInMs=5000) {
   discoveredDevices = {};
@@ -96,32 +106,18 @@ async function selectDevice() {
   return select(prompt);
 }
 
-async function isWritable(peripheral) {
-  // peripheral.on("servicesDiscover", async (services) => {
-  //   console.log("it's me vrk 3", services.length);
-  //   for (const service of services) {
-  //     service.discoverCharacteristics(); // any characteristic UUI
-  //     service.once('characteristicsDiscover', async (characteristics) => {
-  //       for (const characterstic of characteristics) {
-  //         if (!characterstic.properties.includes('write')) {
-  //           continue;
-  //         }
-  //         console.log(characterstic.properties);
-  //       }
-  //     });
-  //   }
-  // })
+async function getWritableCharacteristic(peripheral) {
   await peripheral.connectAsync();
-  // TODO: see if I can just use the async thing
   const { characteristics } = await peripheral.discoverAllServicesAndCharacteristicsAsync();
   const [characteristic] = characteristics.filter(characteristic => { 
     return characteristic.properties.includes('write');
   })
-  if (!characteristic) {
-    return false;
-  }
-  const data = await getPrintDataFromPort();
-  characteristic.write(Buffer.from(data), true);
+  return characteristic;
+}
+
+async function promptTryAgain() {
+  console.log("dang it doesn't look like we can print to this device 😕")
+  return confirm({ message: 'want to try again?' });
 }
 
 async function printData(peripheral, data) {
