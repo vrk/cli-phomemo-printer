@@ -1,91 +1,63 @@
-// Read the battery level of the first found peripheral exposing the Battery Level characteristic
-
 const noble = require('@abandonware/noble');
-var Jimp = require("jimp");
+const Jimp = require("jimp");
 const fs = require('fs')
-var floydSteinberg = require('floyd-steinberg');
-var PNG = require('pngjs').PNG;
+const floydSteinberg = require('floyd-steinberg');
+const PNG = require('pngjs').PNG;
 
-
+//////////////////////////////////////////////
+// Main
+//////////////////////////////////////////////
 
 const BYTES_PER_LINE = 60;
-const IMAGE_WIDTH = 60 * 8;
 
-noble.startScanningAsync([], true); // any service UUID, allow duplicates
+const discovered = {};
 
-const canvas = {
-  width: 20,
-  height: 100,
+function scanDevices() {
+
 }
-
-function getDarkPixel(x, y) {
-  let isDark = true;
-  if (isDark) {
-    return 1;
-  } else {
-    return 0;
+noble.startScanningAsync();
+noble.on('discover', async (peripheral) => {
+  const { localName } = peripheral.advertisement;
+  if (localName === undefined || localName.trim().length === 0) {
+    return;
   }
-}
-
-function getImagePrintData() {
-  // Each 8 pixels in a row is represented by a byte
-  let printData = new Uint8Array(canvas.width / 8 * canvas.height + 8);
-  let offset = 0;
-  // Set the header bytes for printing the image
-  printData[0] = 29;  // Print raster bitmap
-  printData[1] = 118; // Print raster bitmap
-  printData[2] = 48; // Print raster bitmap
-  printData[3] = 0;  // Normal 203.2 DPI
-  printData[4] = canvas.width / 8; // Number of horizontal data bits (LSB)
-  printData[5] = 0; // Number of horizontal data bits (MSB)
-  printData[6] = canvas.height % 256; // Number of vertical data bits (LSB)
-  printData[7] = canvas.height / 256;  // Number of vertical data bits (MSB)
-  offset = 7;
-  // Loop through image rows in bytes
-  for (let i = 0; i < canvas.height; ++i) {
-    for (let k = 0; k < canvas.width / 8; ++k) {
-      let k8 = k * 8;
-      //  Pixel to bit position mapping
-      printData[++offset] = getDarkPixel(k8 + 0, i) * 128 + getDarkPixel(k8 + 1, i) * 64 +
-                  getDarkPixel(k8 + 2, i) * 32 + getDarkPixel(k8 + 3, i) * 16 +
-                  getDarkPixel(k8 + 4, i) * 8 + getDarkPixel(k8 + 5, i) * 4 +
-                  getDarkPixel(k8 + 6, i) * 2 + getDarkPixel(k8 + 7, i);
-    }
+  if (!discovered[localName]) {
+    console.log(localName);
   }
-  return printData;
-}
+  discovered[localName] = peripheral;
+  // if (localName == 'M02S') {
+  //   console.log('here')
+  //   await noble.stopScanningAsync();
+  //   p.on('connect', () => {
+  //     console.log("it's me vrk");
+  //   })
+  //   p.on("disconnect", () => {
+  //     console.log("it's me vrk 2");
+  //   })
+  //   p.on("servicesDiscover", async (services) => {
+  //     console.log("it's me vrk 3", services.length);
+  //     for (const service of services) {
+  //       service.discoverCharacteristics(); // any characteristic UUI
+  //       service.once('characteristicsDiscover', async (characteristics) => {
+  //         for (const characterstic of characteristics) {
+  //           if (!characterstic.properties.includes('write')) {
+  //             continue;
+  //           }
+  //           console.log(characterstic.properties);
+  //           const data = await getPrintDataFromPort();
 
-async function getImageData() {
-  let grayscaleData = [];
-  console.log('here');
-  // pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
-  // await pic.writeAsync("burger3.png");
-  // pic = await Jimp.read("burger3.png");
-  console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
-  for (let x = 0; x < pic.bitmap.width; x++) {
-    for (let y = 0; y < pic.bitmap.height; y++) {
-    // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
-      const rgba = Jimp.intToRGBA(pic.getPixelColor(x, y));
-      if (rgba.r === 0 && rgba.a !== 0) {
-        grayscaleData.push(0)
-      } else {
-        grayscaleData.push(1)
-      }
-    }
-  }
-  
-  return grayscaleData;
-}
+  //           characterstic.write(Buffer.from(data), true);
+  //         }
+  //       });
 
-
-async function getImageDataBurger() {
-  return new Promise((resolve) => {
-    fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
-      floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
-      resolve();
-    });
-  });
-}
+  //     }
+  //   })
+  //   await p.connectAsync();
+  //   console.log('hihi')
+  //   const {characteristics} = await p.discoverAllServicesAndCharacteristicsAsync();
+  //   console.log("hiii", characteristics);
+  // }
+});
 
 
 let line = 0;
@@ -228,39 +200,36 @@ async function getPrintDataFromPort() {
 
 
 
-noble.on('discover', async (p) => {
 
-  if (p.advertisement.localName == 'M02S') {
-    console.log('here')
-    await noble.stopScanningAsync();
-    p.on('connect', () => {
-      console.log("it's me vrk");
-    })
-    p.on("disconnect", () => {
-      console.log("it's me vrk 2");
-    })
-    p.on("servicesDiscover", async (services) => {
-      console.log("it's me vrk 3", services.length);
-      for (const service of services) {
-        service.discoverCharacteristics(); // any characteristic UUI
-        service.once('characteristicsDiscover', async (characteristics) => {
-          for (const characterstic of characteristics) {
-            if (!characterstic.properties.includes('write')) {
-              continue;
-            }
-            console.log(characterstic.properties);
-            const data = await getPrintDataFromPort();
 
-            characterstic.write(Buffer.from(data), true);
-          }
-        });
-
+async function getImageData() {
+  let grayscaleData = [];
+  console.log('here');
+  // pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
+  // await pic.writeAsync("burger3.png");
+  // pic = await Jimp.read("burger3.png");
+  console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
+  for (let x = 0; x < pic.bitmap.width; x++) {
+    for (let y = 0; y < pic.bitmap.height; y++) {
+    // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
+      const rgba = Jimp.intToRGBA(pic.getPixelColor(x, y));
+      if (rgba.r === 0 && rgba.a !== 0) {
+        grayscaleData.push(0)
+      } else {
+        grayscaleData.push(1)
       }
-    })
-    await p.connectAsync();
-    console.log('hihi')
-    const {characteristics} = await p.discoverAllServicesAndCharacteristicsAsync();
-    console.log("hiii", characteristics);
+    }
   }
-});
+  
+  return grayscaleData;
+}
 
+
+async function getImageDataBurger() {
+  return new Promise((resolve) => {
+    fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
+      floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
+      resolve();
+    });
+  });
+}
