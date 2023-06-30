@@ -2,8 +2,14 @@
 
 const noble = require('@abandonware/noble');
 var Jimp = require("jimp");
+const fs = require('fs')
+var floydSteinberg = require('floyd-steinberg');
+var PNG = require('pngjs').PNG;
 
 
+
+const BYTES_PER_LINE = 60;
+const IMAGE_WIDTH = 60 * 8;
 
 noble.startScanningAsync([], true); // any service UUID, allow duplicates
 
@@ -52,12 +58,15 @@ function getImagePrintData() {
 async function getImageData() {
   let grayscaleData = [];
   console.log('here');
-  const pic = await Jimp.read("burger2.png")
+  // pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
+  // await pic.writeAsync("burger3.png");
+  // pic = await Jimp.read("burger3.png");
+  console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
   for (let x = 0; x < pic.bitmap.width; x++) {
     for (let y = 0; y < pic.bitmap.height; y++) {
     // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
       const rgba = Jimp.intToRGBA(pic.getPixelColor(x, y));
-      if (rgba.r === 0) {
+      if (rgba.r === 0 && rgba.a !== 0) {
         grayscaleData.push(0)
       } else {
         grayscaleData.push(1)
@@ -69,20 +78,23 @@ async function getImageData() {
 }
 
 
-// async function getImageDataBurger() {
-//   return new Promise((resolve) => {
-//     fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
-//       floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
-//       resolve();
-//     });
-//   });
-// }
+async function getImageDataBurger() {
+  return new Promise((resolve) => {
+    fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
+      floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
+      resolve();
+    });
+  });
+}
+
 
 let line = 0;
-let remaining = 100;
+let remaining = 480;
 
 async function getPrintDataFromPort() {
-  let burgerData = await getImageData();
+  // await getImageDataBurger()
+  // return;
+  const pic = (await Jimp.read("burger2.png"))
   let printData = [];
   // return printData;
   // const uint8DataArray = new Uint8Array(printData);
@@ -129,7 +141,7 @@ async function getPrintDataFromPort() {
     printData[index++] = 48
     printData[index++] = 0
 
-    printData[index++] = 48
+    printData[index++] = 60 // 60 bytes per line
     printData[index++] = 0
   
     printData[index++] = lines - 1
@@ -147,26 +159,26 @@ async function getPrintDataFromPort() {
       // Each bit represents whether we're printing a pixel or not (1 = yes, print black; 0 = no, print nothing)
       // Therefore we need to go width / 8
 
-      const IMAGE_WIDTH = 100;
-      for (let i = 0; i < IMAGE_WIDTH / 8; i++) {
+      for (let x = 0; x < BYTES_PER_LINE; x++) {
         // Everything just black for now
-        if (i % 2 === 0) {
-          printData[index] = 255;
-        } else {
-          printData[index] = 255;
-        }
+        // if (i % 2 === 0) {
+        //   printData[index] = 255;
+        // } else {
+        //   printData[index] = 255;
+        // }
         // printData[index] = burgerData[i * 4];
 
-        // let byte = 0;
-        // for (let bit = 0; bit < 8; bit++) {
-        //   if (burgerData[i * 8 + bit] === 0) {
-        //     byte |= 1 << (7 - bit)
-        //   }
-        // }
-        // if (byte === 0x0a) {
-        //   byte = 0x14;
-        // }
-        // printData[index] = byte;
+        let byte = 0;
+        for (let bit = 0; bit < 8; bit++) {
+          const rgba = Jimp.intToRGBA(pic.getPixelColor(x * 8 + bit, line));
+          if (rgba.r === 0 && rgba.a !== 0) {
+            byte |= 1 << (7 - bit)
+          }
+        }
+        if (byte === 0x0a) {
+          byte = 0x14;
+        }
+        printData[index] = byte;
         index++;
       }
       // ******
@@ -211,6 +223,7 @@ async function getPrintDataFromPort() {
   // return uint8DataArray;
   return printData;
 }
+
 
 
 
