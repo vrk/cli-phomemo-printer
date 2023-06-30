@@ -35,7 +35,7 @@ Options:
 
 1. **If you're not using the Phomemo M02S:** You will need to edit `index.js` to change `BYTES_PER_LINE` to match your paper. IDK what's the math for this, I just used guess & check to figure it out lol. 
 2. **If you're using smaller receipt paper:** The Phomemo M02S comes with 3 sizes of paper, 53mm (default), 25mm, 15mm. If you're using anything other than 53mm, you're going to have to scale the image using the `-s` flag, e.g. `-s 50` for 25mm paper.
-3. Known issue: I've found that the dithering library I'm using doesn't work well on black & white images. I'll swap it out later...
+3. **Known issue:** I've found that the dithering library I'm using doesn't work well on black & white images. I'll swap it out later...
 
 
 ### Credits
