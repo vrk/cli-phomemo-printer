@@ -281,7 +281,7 @@ async function makeDitheredImage(imgPath) {
   if (!originalFileName) {
     throw new Error();
   }
-  const resizedImgPath = `${imgPath}-resized`;
+  const resizedImgPath = `${imgPath}--resized.png`;
   let pic = await Jimp.read(imgPath);
   pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
   await pic.writeAsync(resizedImgPath);
@@ -289,7 +289,7 @@ async function makeDitheredImage(imgPath) {
 }
 
 async function convertToDithered(resizedImgPath) {
-  const ditheredImgPath = `${resizedImgPath}-dithered`;
+  const ditheredImgPath = `${resizedImgPath}--dithered.png`;
   return new Promise((resolve) => {
     createReadStream(resizedImgPath).pipe(new PNG()).on('parsed', function() {
       floydSteinberg(this).pack().pipe(createWriteStream(ditheredImgPath));
