@@ -10,7 +10,15 @@ import { PNG } from 'pngjs';
 
 const { Spinner } = spinner;
 
-const BYTES_PER_LINE = 69; // TODO: Make this configurable
+//
+// !!!!! NOTE!!!!!!
+// 
+// You need to change BYTES_PER_LINE to match the size of your printer's output.
+//
+// Tbh I'm not sure what's the right way to calcuate this properly; I just guessed & checked until
+// I got an image that printed full-width!
+//
+const BYTES_PER_LINE = 69;
 const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
 const SCAN_AGAIN_SELECTION = "__scan_again__";
@@ -18,9 +26,9 @@ const QUIT_SELECTION = "__quit__";
 
 let discoveredDevices = {};
 
-//////////////////////////////////////////////
+//
 // main
-//////////////////////////////////////////////
+//
 
 const program = new Command();
 program
@@ -36,9 +44,9 @@ if (file, scale) {
   printerMenu(printableImgPath);
 }
 
-//////////////////////////////////////////////
+//
 // functions
-//////////////////////////////////////////////
+//
 
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -139,7 +147,6 @@ async function promptTryAgain() {
   console.log("dang it doesn't look like we can print to this device 😕")
   return confirm({ message: 'want to try again?' });
 }
-
 
 async function getPrintDataFromPort(printableImgPath) {
   const pic = await Jimp.read(printableImgPath)
