@@ -1,174 +1,213 @@
-// Read the battery level of the first found peripheral exposing the Battery Level characteristic
+import noble from '@abandonware/noble';
+import spinner from 'cli-spinner';
+import { Command } from 'commander';
+import floydSteinberg from 'floyd-steinberg';
+import { createReadStream, createWriteStream } from 'fs';
+import * as path from 'path';
+import { select, confirm } from '@inquirer/prompts';
+import Jimp from "jimp";
+import { PNG } from 'pngjs';
 
-const noble = require('@abandonware/noble');
-var Jimp = require("jimp");
-const fs = require('fs')
-var floydSteinberg = require('floyd-steinberg');
-var PNG = require('pngjs').PNG;
+const { Spinner } = spinner;
 
+//
+// !!!!! NOTE!!!!!!
+// 
+// You need to change BYTES_PER_LINE to match the size of your printer's output.
+//
+// Tbh I'm not sure what's the right way to calcuate this properly; I just guessed & checked until
+// I got an image that printed full-width!
+//
+const BYTES_PER_LINE = 70;
+const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
+const SCAN_AGAIN_SELECTION = "__scan_again__";
+const QUIT_SELECTION = "__quit__";
 
-const BYTES_PER_LINE = 60;
-const IMAGE_WIDTH = 60 * 8;
+let discoveredDevices = {};
 
-noble.startScanningAsync([], true); // any service UUID, allow duplicates
+//
+// main
+//
 
-const canvas = {
-  width: 20,
-  height: 100,
+const program = new Command();
+program
+  .option('-f, --file <path>', 'path for image to print', './burger.png')
+  .option('-s, --scale <size>', 'percent scale at which the image should print (1-100)', 100);
+program.parse(process.argv);
+const { file, scale } = program.opts()
+
+const printableImgPath = await makeDitheredImage(file, scale);
+const characteristic = await getDeviceCharacteristicMenu(printableImgPath);
+const data = await getPrintDataFromPort(printableImgPath);
+characteristic.write(Buffer.from(data), true);
+
+//
+// functions
+//
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function getDarkPixel(x, y) {
-  let isDark = true;
-  if (isDark) {
-    return 1;
-  } else {
-    return 0;
-  }
-}
+async function getDeviceCharacteristicMenu(printableImgPath) {
+  let scanDurationInMs = 5000;
+  do {
+    await scanDevices(scanDurationInMs);
+    const choice = await selectDevice();
 
-function getImagePrintData() {
-  // Each 8 pixels in a row is represented by a byte
-  let printData = new Uint8Array(canvas.width / 8 * canvas.height + 8);
-  let offset = 0;
-  // Set the header bytes for printing the image
-  printData[0] = 29;  // Print raster bitmap
-  printData[1] = 118; // Print raster bitmap
-  printData[2] = 48; // Print raster bitmap
-  printData[3] = 0;  // Normal 203.2 DPI
-  printData[4] = canvas.width / 8; // Number of horizontal data bits (LSB)
-  printData[5] = 0; // Number of horizontal data bits (MSB)
-  printData[6] = canvas.height % 256; // Number of vertical data bits (LSB)
-  printData[7] = canvas.height / 256;  // Number of vertical data bits (MSB)
-  offset = 7;
-  // Loop through image rows in bytes
-  for (let i = 0; i < canvas.height; ++i) {
-    for (let k = 0; k < canvas.width / 8; ++k) {
-      let k8 = k * 8;
-      //  Pixel to bit position mapping
-      printData[++offset] = getDarkPixel(k8 + 0, i) * 128 + getDarkPixel(k8 + 1, i) * 64 +
-                  getDarkPixel(k8 + 2, i) * 32 + getDarkPixel(k8 + 3, i) * 16 +
-                  getDarkPixel(k8 + 4, i) * 8 + getDarkPixel(k8 + 5, i) * 4 +
-                  getDarkPixel(k8 + 6, i) * 2 + getDarkPixel(k8 + 7, i);
-    }
-  }
-  return printData;
-}
+    if (choice === SCAN_AGAIN_SELECTION) {
+      scanDurationInMs = 10000; // Try a longer duration the second time
+      scanDevices();
+    } else if (choice == QUIT_SELECTION) {
+      process.exit();
+    } else {
 
-async function getImageData() {
-  let grayscaleData = [];
-  console.log('here');
-  // pic = pic.resize(IMAGE_WIDTH, Jimp.AUTO)
-  // await pic.writeAsync("burger3.png");
-  // pic = await Jimp.read("burger3.png");
-  console.log("VRK HERE", pic.bitmap.width, pic.bitmap.height)
-  for (let x = 0; x < pic.bitmap.width; x++) {
-    for (let y = 0; y < pic.bitmap.height; y++) {
-    // for (let y = pic.bitmap.height / 2; y < pic.bitmap.height / 2 + 1; y++) {
-      const rgba = Jimp.intToRGBA(pic.getPixelColor(x, y));
-      if (rgba.r === 0 && rgba.a !== 0) {
-        grayscaleData.push(0)
+      // Let's see if we can write to this device.
+      let peripheral = discoveredDevices[choice];
+      const characteristic = await getWritableCharacteristic(peripheral);
+
+      // Looks like we can't write to this device.
+      if (!characteristic) {
+        const tryAgain = await promptTryAgain()
+        if (tryAgain) {
+          continue;
+        } else {
+          process.exit();
+        }
       } else {
-        grayscaleData.push(1)
+        // We can write to the device, so send the characteristic.
+        return characteristic;
       }
     }
-  }
-  
-  return grayscaleData;
+  } while (true);
 }
 
+async function scanDevices(scanDurationInMs=5000) {
+  discoveredDevices = {};
 
-async function getImageDataBurger() {
-  return new Promise((resolve) => {
-    fs.createReadStream('burger.png').pipe(new PNG()).on('parsed', function() {
-      floydSteinberg(this).pack().pipe(fs.createWriteStream('burger2.png'));
-      resolve();
-    });
+  const spinner = new Spinner('scanning bluetooth devices.. %s');
+  spinner.setSpinnerString('|/-\\');
+  spinner.start();
+  noble.on('discover', async (peripheral) => {
+    const { localName } = peripheral.advertisement;
+    if (localName === undefined || localName.trim().length === 0) {
+      return;
+    }
+    discoveredDevices[localName] = peripheral;
   });
+  noble.startScanningAsync();
+
+  await delay(scanDurationInMs);
+
+  await noble.stopScanningAsync();
+  spinner.stop(true);
 }
 
+async function selectDevice() {
+  const choices = [];
+  for (const key in discoveredDevices) {
+    choices.push({
+      value: key
+    });
+  }
+  choices.push({
+    name: "- Scan again",
+    value: SCAN_AGAIN_SELECTION
+  });
 
-let line = 0;
-let remaining = 480;
+  choices.push({
+    name: "- Quit",
+    value: QUIT_SELECTION
+  });
 
-async function getPrintDataFromPort() {
-  // await getImageDataBurger()
-  // return;
-  const pic = (await Jimp.read("burger2.png"))
+  const prompt = {
+    message: "Select your bluetooth printer",
+    choices,
+    pageSize: 12
+  }
+  return select(prompt);
+}
+
+async function getWritableCharacteristic(peripheral) {
+  await peripheral.connectAsync();
+  const { characteristics } = await peripheral.discoverAllServicesAndCharacteristicsAsync();
+  const [characteristic] = characteristics.filter(characteristic => { 
+    return characteristic.properties.includes('write');
+  })
+  return characteristic;
+}
+
+async function promptTryAgain() {
+  console.log("dang it doesn't look like we can print to this device 😕")
+  return confirm({ message: 'want to try again?' });
+}
+
+async function getPrintDataFromPort(printableImgPath) {
+  const pic = await Jimp.read(printableImgPath)
+  let remaining = pic.bitmap.height;
   let printData = [];
-  // return printData;
-  // const uint8DataArray = new Uint8Array(printData);
-  // return uint8DataArray;
+  let index = 0;
 
   // ********
   // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
   // PRINTING HEADER
 
   // Initialize printer
-  printData[0] = 27;  
-  printData[1] = 64;
+  printData[index++] = 27;
+  printData[index++] = 64;
 
   // Select justification
-  printData[2] = 27; 
-  printData[3] = 97; 
+  printData[index++] = 27; 
+  printData[index++] = 97; 
 
   // Justify (0=left, 1=center, 2=right)
-  printData[4] = 1; 
+  printData[index++] = 0; 
 
   // End of header
-  printData[5] = 31; 
-  printData[6] = 17; 
-  printData[7] = 2; 
-  printData[8] = 4;
+  printData[index++] = 31; 
+  printData[index++] = 17; 
+  printData[index++] = 2; 
+  printData[index++] = 4;
   // ********
 
-  let index = 9;
+  let line = 0;
+
   while (remaining > 0) {
     let lines = remaining
     if (lines > 256) {
       lines = 256;
     }
+  
     // ********
-    // FROM https://github.com/vivier/phomemo-tools/tree/master#31-header
+    // FROM https://github.com/vivier/phomemo-tools/tree/master#32-block-marker
     // PRINTING MARKER
 
-    // 0x761d.to_bytes(2, 'little') -> b'\x1dv'.hex() -> 1d76
-
+    // Print raster bit image
     printData[index++] = 29
     printData[index++] = 118
-
-    // stdout.write(0x0030.to_bytes(2, 'little'))
     printData[index++] = 48
+
+    // Mode: 0=normal, 1=double width, 2=double height, 3=quadruple
     printData[index++] = 0
 
-    printData[index++] = 60 // 60 bytes per line
+    // Bytes per line
+    printData[index++] = BYTES_PER_LINE
     printData[index++] = 0
   
-    printData[index++] = lines - 1
-    console.log("lines is", lines);
+    // Number of lines to print in this block.
+    printData[index++] = lines - 1;
     printData[index++] = 0
     // ********
 
     remaining -= lines;
-    console.log("remaining", remaining);
 
     while (lines > 0) {
       // ******
       // PRINT LINE
-
-      // Each bit represents whether we're printing a pixel or not (1 = yes, print black; 0 = no, print nothing)
-      // Therefore we need to go width / 8
-
       for (let x = 0; x < BYTES_PER_LINE; x++) {
-        // Everything just black for now
-        // if (i % 2 === 0) {
-        //   printData[index] = 255;
-        // } else {
-        //   printData[index] = 255;
-        // }
-        // printData[index] = burgerData[i * 4];
-
         let byte = 0;
+
         for (let bit = 0; bit < 8; bit++) {
           const rgba = Jimp.intToRGBA(pic.getPixelColor(x * 8 + bit, line));
           if (rgba.r === 0 && rgba.a !== 0) {
@@ -178,8 +217,7 @@ async function getPrintDataFromPort() {
         if (byte === 0x0a) {
           byte = 0x14;
         }
-        printData[index] = byte;
-        index++;
+        printData[index++] = byte;
       }
       // ******
       lines--;
@@ -188,9 +226,11 @@ async function getPrintDataFromPort() {
   }
 
 
-
   // ******
+  // FROM: https://github.com/vivier/phomemo-tools/tree/master#33-footer
   // PRINT FOOTER
+
+  // command ESC d : print and feed n lines (twice)
   printData[index++] = 27;
   printData[index++] = 100;
   printData[index++] = 2;
@@ -198,6 +238,8 @@ async function getPrintDataFromPort() {
   printData[index++] = 27;
   printData[index++] = 100;
   printData[index++] = 2;
+
+  // just footer codes now
 
   // b'\x1f\x11\x08'
   printData[index++] = 31;
@@ -218,49 +260,41 @@ async function getPrintDataFromPort() {
   printData[index++] = 17;
   printData[index++] = 9;
 
-
-  // const uint8DataArray = new Uint8Array(printData);
-  // return uint8DataArray;
   return printData;
 }
 
-
-
-
-
-noble.on('discover', async (p) => {
-
-  if (p.advertisement.localName == 'M02S') {
-    console.log('here')
-    await noble.stopScanningAsync();
-    p.on('connect', () => {
-      console.log("it's me vrk");
-    })
-    p.on("disconnect", () => {
-      console.log("it's me vrk 2");
-    })
-    p.on("servicesDiscover", async (services) => {
-      console.log("it's me vrk 3", services.length);
-      for (const service of services) {
-        service.discoverCharacteristics(); // any characteristic UUI
-        service.once('characteristicsDiscover', async (characteristics) => {
-          for (const characterstic of characteristics) {
-            if (!characterstic.properties.includes('write')) {
-              continue;
-            }
-            console.log(characterstic.properties);
-            const data = await getPrintDataFromPort();
-
-            characterstic.write(Buffer.from(data), true);
-          }
-        });
-
-      }
-    })
-    await p.connectAsync();
-    console.log('hihi')
-    const {characteristics} = await p.discoverAllServicesAndCharacteristicsAsync();
-    console.log("hiii", characteristics);
+async function makeDitheredImage(imgPath, scale) {
+  let originalFileName = path.basename('path');
+  if (!originalFileName) {
+    throw new Error();
   }
-});
+  let pic = await Jimp.read(imgPath);
+  const scalePercentage = Math.max(scale / 100.0, 0.01); 
+  const scaledWidth = Math.floor(scalePercentage * IMAGE_WIDTH);
 
+  // Scale the given image to the desired size.
+  const resizedImgPath = `${imgPath}--resized.png`;
+  pic = pic.resize(scaledWidth, Jimp.AUTO)
+
+  // Scale a transparent background to the width expected by the printer, and the height
+  // of the scaled image.
+  let transparentBackground = await Jimp.read('./transparent-square.png');
+  transparentBackground = transparentBackground.resize(IMAGE_WIDTH, pic.bitmap.height);
+  const x = IMAGE_WIDTH - pic.bitmap.width;
+  const composedPic = transparentBackground.composite(pic, x, 0);  
+
+  await composedPic.writeAsync(resizedImgPath);
+
+  // TODO: Swap out dithering library for something that works better with B&W images.
+  return convertToDithered(resizedImgPath);
+}
+
+async function convertToDithered(resizedImgPath) {
+  const ditheredImgPath = `${resizedImgPath}--dithered.png`;
+  return new Promise((resolve) => {
+    createReadStream(resizedImgPath).pipe(new PNG()).on('parsed', function() {
+      floydSteinberg(this).pack().pipe(createWriteStream(ditheredImgPath));
+      resolve(ditheredImgPath);
+    });
+  });
+}

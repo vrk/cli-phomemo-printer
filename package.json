@@ -1,6 +1,9 @@
 {
   "dependencies": {
     "@abandonware/noble": "^1.9.2-21",
+    "@inquirer/prompts": "^2.2.0",
+    "cli-spinner": "^0.2.10",
+    "commander": "^11.0.0",
     "escpos-buffer": "^4.0.5",
     "floyd-steinberg": "^1.0.6",
     "jimp": "^0.22.8",
@@ -9,12 +12,13 @@
     "pngjs": "^7.0.0",
     "react-thermal-printer": "^0.13.0"
   },
-  "name": "another",
+  "name": "cli-phomemo-printer",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "type": "module",
   "author": "",
   "license": "ISC",
   "description": ""
