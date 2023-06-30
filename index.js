@@ -10,7 +10,7 @@ import { PNG } from 'pngjs';
 
 const { Spinner } = spinner;
 
-const BYTES_PER_LINE = 30; // TODO: Make this configurable
+const BYTES_PER_LINE = 70; // TODO: Make this configurable
 const IMAGE_WIDTH = BYTES_PER_LINE * 8;
 
 const SCAN_AGAIN_SELECTION = "__scan_again__";
@@ -140,12 +140,12 @@ async function promptTryAgain() {
 }
 
 let line = 0;
-let remaining = 480;
 
 async function getPrintDataFromPort(printableImgPath) {
   // await getImageDataBurger()
   // return;
   const pic = await Jimp.read(printableImgPath)
+  let remaining = pic.bitmap.height;
   let printData = [];
   // return printData;
   // const uint8DataArray = new Uint8Array(printData);
@@ -192,7 +192,7 @@ async function getPrintDataFromPort(printableImgPath) {
     printData[index++] = 48
     printData[index++] = 0
 
-    printData[index++] = 60 // 60 bytes per line
+    printData[index++] = BYTES_PER_LINE
     printData[index++] = 0
   
     printData[index++] = lines - 1
@@ -295,3 +295,4 @@ async function convertToDithered(resizedImgPath) {
     });
   });
 }
+
