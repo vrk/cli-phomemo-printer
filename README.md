@@ -12,6 +12,14 @@ https://github.com/vrk/cli-phomemo-printer/assets/610200/edcb1904-9748-4fbc-8a5c
 
 ### How to install & run
 
+#### Permissions
+
+**MacOS: You must enable Bluetooth permissions for the terminal on which this runs**
+
+This is done by going to System Settings -> Privacy & Security -> Bluetooth, and then adding the terminal program (e.g. iTerm) to allow Bluetooth connections.
+
+#### Clone & run
+
 This isn't listed on npm (yet?) so you need to clone and build locally to run, e.g.
 
 ```
