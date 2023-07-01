@@ -14,7 +14,7 @@ https://github.com/vrk/cli-phomemo-printer/assets/610200/edcb1904-9748-4fbc-8a5c
 
 #### Permissions
 
-**MacOS: You must enable Bluetooth permissions for the terminal on which this runs**
+For MacOS: You must enable Bluetooth permissions for the terminal on which this runs
 
 This is done by going to System Settings -> Privacy & Security -> Bluetooth, and then adding the terminal program (e.g. iTerm) to allow Bluetooth connections.
 
